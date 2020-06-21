@@ -10,6 +10,28 @@
 
 #-------------------------------- References --------------------------------#
 
+/reference:..\MonoGame.Extended.Content.Pipeline.dll
+/reference:..\MonoGame.Extended.dll
+/reference:..\MonoGame.Extended.Tiled.dll
 
 #---------------------------------- Content ---------------------------------#
+
+#begin brick.png
+/copy:brick.png
+
+#begin Graphics/basicchar.xnb
+/copy:Graphics/basicchar.xnb
+
+#begin obj/WindowsStoreApp/Content/.mgstats
+/copy:obj/WindowsStoreApp/Content/.mgstats
+
+#begin test.tmx
+/importer:TiledMapImporter
+/processor:TiledMapProcessor
+/build:test.tmx
+
+#begin tileset1.tsx
+/importer:TiledMapTilesetImporter
+/processor:TiledMapTilesetProcessor
+/build:tileset1.tsx
 
