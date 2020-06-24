@@ -13,6 +13,7 @@ namespace simulation
         public Texture2D PlayerTexture;
         public Vector2 Position;
         public int Direction;
+        public Vector2[] playerVerts;
         public int Height {
             get { return PlayerTexture.Height; }
         }
@@ -20,12 +21,23 @@ namespace simulation
         {
             get { return PlayerTexture.Width; }
         }
+        public Vector2[] Verts
+        {
+            get { return playerVerts; }
+        }
+
         public void Initialize(Texture2D texture, Vector2 position, int direction)
 
         {
             PlayerTexture = texture;
             Position = position;
             Direction = direction;
+            playerVerts = new Vector2[] {
+                position,
+                new Vector2(position.X + this.Width, position.Y),
+                new Vector2(position.X + this.Width, position.Y + this.Height),
+                new Vector2(position.X, position.Y + this.Height)
+            };
         }
 
 

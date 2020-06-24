@@ -18,7 +18,6 @@ namespace simulation
     public class Game1 : Game
     {
         GraphicsDeviceManager graphics;
-        ///GraphicsDevice graphicsDevice = new GraphicsDevice();
         SpriteBatch spriteBatch;
         Player player;
         TiledMap map;

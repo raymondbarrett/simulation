@@ -104,7 +104,9 @@
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
     <Compile Include="Camera2d.cs" />
-    <Compile Include="collisionMap.cs" />
+    <Compile Include="CollisionPoly.cs" />
+    <Compile Include="CollisionMap.cs" />
+    <Compile Include="GJK_Collision.cs" />
     <Compile Include="Level.cs" />
     <Compile Include="Player.cs" />
     <Compile Include="GamePage.xaml.cs">
