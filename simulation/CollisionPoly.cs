@@ -19,6 +19,7 @@ namespace simulation
         public Vector2[] vert
         {
             get { return Vertices; }
+            set { value = Vertices; }
         }
 
         public Vector2 supportFunction(Vector2 direction)
@@ -43,7 +44,7 @@ namespace simulation
                 centerpoint.X += vertex.X;
                 centerpoint.Y += vertex.Y;
             }
-            Vector2.Divide(centerpoint, Vertices.Length);
+            centerpoint = Vector2.Divide(centerpoint, Vertices.Length);
             return centerpoint;
         }
         //public static Boolean isCollision(CollisionPoly obj1, CollisionPoly obj2)

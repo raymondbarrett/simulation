@@ -38,7 +38,7 @@ namespace simulation
                 {
                     case 0:
                         //direction in the direction of separation
-                        direction = Vector2.Subtract(poly1.center(), poly2.center());
+                        direction = Vector2.Subtract(poly2.center(), poly1.center());
                         break;
                     case 1:
                         //direction opposite direction of separation
@@ -71,60 +71,445 @@ namespace simulation
                             return true;
                         }
                         break;
-                }
-                Vector2 nextVert = Vector2.Subtract(poly1.supportFunction(direction), poly2.supportFunction(Vector2.Multiply(direction, -1)));
-                if (Vector2.Dot(direction, nextVert) > 0)
+                } 
+                Vector2 nextVert = Vector2.Subtract(poly1.supportFunction(direction), poly2.supportFunction(Vector2.Negate(direction)));
+                if (Vector2.Dot(direction, nextVert) >= 0)
                 {
                     simplex.Add(nextVert);
                 }
                 else
                 {
+                    
                     return false;
                 }
             }
         }
-        public static calculateIntersection(Player player, Vector2 finalPosition) { }
+        public static Vector2 calculateIntersection(CollisionPoly poly1, CollisionPoly poly2, Vector2? velocity)
+        {
+            //Constructs basic simplex
+            Vector2 direction = Vector2.Subtract(poly1.center(), poly2.center());
+            List<Vector2> simplex = new List<Vector2>();
+            simplex.Add(Vector2.Subtract(poly1.supportFunction(direction), poly2.supportFunction(Vector2.Multiply(direction, -1))));
+            direction = Vector2.Multiply(direction, -1);
+            simplex.Add(Vector2.Subtract(poly1.supportFunction(direction), poly2.supportFunction(Vector2.Multiply(direction, -1))));
+            direction = tripleCrossProd(Vector2.Subtract(simplex[1], simplex[0]), Vector2.Multiply(simplex[0], -1), Vector2.Subtract(simplex[1], simplex[0]));
+            simplex.Add(Vector2.Subtract(poly1.supportFunction(direction), poly2.supportFunction(Vector2.Multiply(direction, -1))));
+
+            //Calculates distance inside/outside object
+            if (velocity.HasValue)
+            {
+                while (true)
+                {
+                    Edge closestEdge = closestEdgeAlongVector(simplex, (Vector2)velocity);
+                    Vector2 support = Vector2.Subtract(poly1.supportFunction(closestEdge.normal), poly2.supportFunction(Vector2.Negate(closestEdge.normal)));
+                    if (Math.Abs(Vector2.Dot(support, closestEdge.normal) - closestEdge.dist) <= 0.0001)
+                    {
+                        return closestEdge.toOrigin;
+                    }
+                    else
+                    {
+                        simplex.Insert(closestEdge.index, support);
+                    }
+                }
+            }
+            else
+            {
+                while (true)
+                {
+                    Edge closestEdge = closestEdgeToOrigin(simplex);
+                    Vector2 support = Vector2.Subtract(poly1.supportFunction(closestEdge.normal), poly2.supportFunction(Vector2.Negate(closestEdge.normal)));
+                    if (Math.Abs(Vector2.Dot(support, closestEdge.normal) - closestEdge.dist) <= 0.00001)
+                    {
+                        return Vector2.Multiply(closestEdge.normal, Vector2.Dot(support, closestEdge.normal));
+                    }
+                    else
+                    {
+                        simplex.Insert(closestEdge.index, support);
+                    }
+                }
+            }
+        }
+        public static Edge closestEdgeAlongVector(List<Vector2> simplex, Vector2 vector)
+        {
+
+            float currentClosest = float.PositiveInfinity;
+            int closestIndex = 0;
+            int toVertex = 0;
+            //Implementation of intersection of two lines as seen here:
+            //https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
+            float x1;
+            float y1;
+            float x2;
+            float y2;
+            float x3;
+            float y3;
+            float x4;
+            float y4;
+            float denominator;
+            float commonTermP1;
+            float commonTermP2;
+            float xval;
+            float yval;
+            float closestX = 0;
+            float closestY = 0;
+            float[] distances = new float[simplex.Count];
+            for (int i = 0; i < simplex.Count; i++)
+            {
+                toVertex = toVertex < simplex.Count - 1 ? i + 1 : 0;
+                x1 = simplex[i].X;
+                y1 = simplex[i].Y;
+                x2 = simplex[toVertex].X;
+                y2 = simplex[toVertex].Y;
+                x3 = 0;
+                y3 = 0;
+                x4 = vector.X;
+                y4 = vector.Y;
+                distances[i] = (y4 * x1 - x4 * y1) / (float) Math.Pow(Math.Pow(y4,2) + Math.Pow(x4, 2), 0.5);
+                denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+                commonTermP1 = (x1 * y2) - (y1 * x2);
+                commonTermP2 = (x3 * y4) - (y3 * x4);
+                if (Math.Abs(denominator) > 0.0000001)
+                {
+                    xval = ((commonTermP1 * (x3 - x4)) - ((x1 - x2) * commonTermP2)) / denominator;
+                    yval = ((commonTermP1 * (y3 - y4)) - ((y1 - y2) * commonTermP2)) / denominator;
+                }
+                else
+                {
+                    xval = float.MaxValue;
+                    yval = float.MaxValue;
+                }
+                if (isBetween(xval, x1, x2) && isBetween(yval, y1, y2))
+                {
+                    if (Math.Pow(Math.Pow(xval, 2) + Math.Pow(yval, 2), 0.5) < currentClosest)
+                    {
+                        currentClosest = (float) Math.Pow(Math.Pow(xval, 2) + Math.Pow(yval, 2), 0.5);
+                        closestIndex = i;
+                        closestX = xval;
+                        closestY = yval;
+                    }
+                }
+
+            }
+            if(float.IsInfinity(currentClosest))
+            {
+                float lowestDistance = distances[0];
+                int lowestDistanceIndex = 0;
+                for (int i = 1; i < distances.Length; i++)
+                {
+                    if (distances[i] < lowestDistance)
+                    {
+                        lowestDistance = distances[i];
+                        lowestDistanceIndex = i;
+                    }
+                }
+                int index1 = lowestDistanceIndex - 1 >= 0 ? lowestDistanceIndex - 1 : distances.Length - 1;
+                int index2 = lowestDistanceIndex;
+                if (distances[index1] < distances[index2])
+                {
+                    Vector2 edgeVector = Vector2.Subtract(simplex[index1], simplex[lowestDistanceIndex]);
+                    Vector2 edgeNorm = Vector2.Normalize(new Vector2(edgeVector.Y, -edgeVector.X));
+                    return new Edge(edgeVector, lowestDistanceIndex, edgeNorm, Vector2.Dot(edgeNorm, simplex[index1]), new Vector2(float.PositiveInfinity));
+                }
+                else
+                {
+                    Vector2 edgeVector = Vector2.Subtract(simplex[lowestDistanceIndex], simplex[index2]);
+                    Vector2 edgeNorm = Vector2.Normalize(new Vector2(edgeVector.Y, -edgeVector.X));
+                    return new Edge(edgeVector, index2, edgeNorm, Vector2.Dot(edgeNorm, simplex[lowestDistanceIndex]), new Vector2(float.PositiveInfinity));
+                }
+
+            }
+            else
+            {
+                int fromVertex = closestIndex > 0 ? closestIndex - 1 : simplex.Count - 1;
+                Vector2 edgeVector = Vector2.Subtract(simplex[fromVertex], simplex[closestIndex]);
+                Vector2 edgeNorm = Vector2.Normalize(new Vector2(edgeVector.Y, -edgeVector.X));
+                return new Edge(edgeVector, closestIndex, edgeNorm, Vector2.Dot(edgeNorm, simplex[fromVertex]), new Vector2(closestX, closestY));
+            }
+            
+
+            
+        }
+        public static bool isBetween(float testint, float val1, float val2)
+        {
+            if (val1 > val2)
+            {
+                return testint < val1 && testint > val2;
+            }
+            else
+            {
+                return testint < val2 && testint > val1;
+            }
+        }
+        public static Edge closestEdgeToOrigin(List<Vector2> simplex)
+        {
+            float currentClosest = float.PositiveInfinity;
+            int closestIndex = 0;
+            int toVertex = 0;
+            Vector2 currentLine;
+            Vector2 closestNormal = new Vector2();
+            for (int i = 0; i < simplex.Count; i++)
+            {
+                toVertex = toVertex < simplex.Count - 1 ? i + 1 : 0;
+                currentLine = Vector2.Subtract(simplex[i], simplex[toVertex]);
+
+                Vector2 currentNorm = Vector2.Normalize(new Vector2(currentLine.Y, -currentLine.X));
+                if (Vector2.Dot(currentNorm, simplex[i]) < currentClosest)
+                {
+                    currentClosest = Vector2.Dot(currentNorm, simplex[i]);
+                    closestIndex = toVertex;
+                    closestNormal = currentNorm;
+                }
+            }
+            int fromVertex = closestIndex > 0 ? closestIndex - 1 : simplex.Count - 1;
+            return new Edge(Vector2.Subtract(simplex[fromVertex], simplex[closestIndex]), closestIndex, closestNormal, Vector2.Dot(closestNormal, simplex[fromVertex]));
+        }
+
         public static Vector2 tripleCrossProd(Vector2 firstvector, Vector2 secondvector, Vector2 thirdvector)
         {
             Vector3 vector1 = new Vector3(firstvector.X, firstvector.Y, 0);
             Vector3 vector2 = new Vector3(secondvector.X, secondvector.Y, 0);
             Vector3 vector3 = new Vector3(thirdvector.X, thirdvector.Y, 0);
             Vector3 output = Vector3.Cross(Vector3.Cross(vector1, vector2), vector3);
+     
             return new Vector2(output.X, output.Y);
         }
         public Vector2[] broadPhase(Vector2 initialPos, Vector2 finalPos, Vector2 dim)
         {
-            Vector2[] broadPhaseBoxCorners = new Vector2[2];
-            broadPhaseBoxCorners[0] = Vector2.Divide(initialPos,tileSize);
-            broadPhaseBoxCorners[1] = Vector2.Divide(finalPos + dim, tileSize);
-            return broadPhaseBoxCorners;
-        }
-        public Vector2 calculateCollisions(Vector2 velocity, Vector2 finalPos, Player player)
-        {
-            Vector2[] bBox = broadPhase(player.Position, finalPos, new Vector2(player.Height, player.Width));
-            Vector2[] finalPosVerts = Enumerable.ToArray<Vector2>(from vert in player.Verts select Vector2.Add(vert, velocity));
-            CollisionPoly playerPoly = new CollisionPoly(finalPosVerts);
-            int currentTile;
-            for (int i = (int)Math.Floor(bBox[0].X); i < (int)Math.Ceiling(bBox[1].X); i++)
-            {
-                for (int j = (int)Math.Floor(bBox[0].Y); j < (int)Math.Ceiling(bBox[1].Y); j++)
-                {
-                    currentTile = collisionArray[i, j];
-                    if (currentTile == 0)
-                    {
-                        return velocity;
-                    }
-                    else if (currentTile == 1)
-                    {
-                        if (isCollision(playerPoly, new CollisionPoly(new Vector2[] { new Vector2(i * tileSize, j * tileSize), new Vector2((i + 1) * tileSize, j * tileSize), new Vector2(i * tileSize, (j + 1) * tileSize), new Vector2((i + 1) * tileSize, (j + 1) * tileSize) })))
-                        {
+            return new Vector2[2] { Vector2.Divide(new Vector2(Math.Min(initialPos.X, finalPos.X), Math.Min(initialPos.Y, finalPos.Y)) , tileSize),
+                                    Vector2.Divide(Vector2.Add(new Vector2(Math.Max(initialPos.X, finalPos.X), Math.Max(initialPos.Y, finalPos.Y)), dim), tileSize)};
 
+        }
+        public float[,] calculateTimes(int initialX, int initialY, int finalX, int finalY, CollisionPoly initialPos, Vector2 velocity, int unitConversion)
+        {
+            int currentTile;
+            float[,] collisionTimes = new float[finalY - initialY, finalX - initialX];
+            CollisionPoly tilePoly;
+            for (int i = initialY; i < finalY; i++)
+            {
+                for (int j = initialX; j < finalX; j++)
+                {
+                    //System.Diagnostics.Debug.WriteLine(i + " , " + j);
+                    currentTile = collisionArray[i, j];
+
+                    switch (currentTile)
+                    {
+                        case 0:
+                            tilePoly = null;
+                            break;
+                        case 1:
+                            tilePoly = new CollisionPoly(new Vector2[] { new Vector2(j * tileSize, i * tileSize), new Vector2((j + 1) * tileSize, i * tileSize), new Vector2((j + 1) * tileSize, (i + 1) * tileSize), new Vector2(j * tileSize, (i + 1) * tileSize) });
+                            break;
+                        case 2:
+                            tilePoly = new CollisionPoly(new Vector2[] { new Vector2((j + 1) * tileSize, i * tileSize), new Vector2((j + 1) * tileSize, (i + 1) * tileSize), new Vector2(j * tileSize, (i + 1) * tileSize) });
+                            break;
+                        case 3:
+                            tilePoly = new CollisionPoly(new Vector2[] { new Vector2(j * tileSize, i * tileSize), new Vector2((j + 1) * tileSize, (i + 1) * tileSize), new Vector2(j * tileSize, (i + 1) * tileSize) });
+                            break;
+                        default:
+                            tilePoly = new CollisionPoly(new Vector2[4]);
+                            break;
+                    }
+                    if (tilePoly != null)
+                    {
+                        collisionTimes[i - initialY, j - initialX] = calculateIntersection(initialPos, tilePoly, velocity).Length() / (velocity.Length() * unitConversion);
+                    }
+                    else
+                    {
+                        collisionTimes[i - initialY,j - initialX] = float.MaxValue;
+                    }
+
+                }
+
+            }
+            return collisionTimes;
+        }
+
+        public Vector2 calculateCollisions(Vector2 velocity, Vector2 initialPos, Player player,float elapsedTime, int unitConversion)
+        {
+            
+            while (true)
+            {
+                
+                Vector2[] bBox = broadPhase(initialPos, player.Position, new Vector2(player.Width, player.Height));
+                CollisionPoly tilePoly = new CollisionPoly(new Vector2[4]);
+                CollisionPoly playerPoly = new CollisionPoly(player.Verts);
+                CollisionPoly initialPosVerts = new CollisionPoly(new Vector2[] {
+                                                                  initialPos,
+                                                                  new Vector2(initialPos.X + player.Width, initialPos.Y),
+                                                                  new Vector2(initialPos.X + player.Width, initialPos.Y + player.Height),
+                                                                  new Vector2(initialPos.X, initialPos.Y + player.Height)
+                                                                  });
+                float[,] collisionTimes = calculateTimes((int)Math.Floor(bBox[0].X), (int)Math.Floor(bBox[0].Y), (int)Math.Ceiling(bBox[1].X), (int)Math.Ceiling(bBox[1].Y), initialPosVerts, velocity, unitConversion);
+
+                //System.Diagnostics.Debug.WriteLine("(" + bBox[0].X + "," + bBox[0].Y + ") ; (" + bBox[1].X + "," + bBox[1].Y + ")");
+                //calculates index/indicies with the lowest collisionTime
+                List<int[]> lowestIndices = new List<int[]>();
+                float currentLowest = float.MaxValue;
+                for (int i = 0; i < collisionTimes.GetLength(0); i++)
+                {
+                    for (int j = 0; j < collisionTimes.GetLength(1); j++)
+                    {
+                        if (collisionTimes[i, j] < currentLowest)
+                        {
+                            currentLowest = collisionTimes[i, j];
                         }
                     }
                 }
+                for (int i = 0; i < collisionTimes.GetLength(0); i++)
+                {
+                    for (int j = 0; j < collisionTimes.GetLength(1); j++)
+                    {
+                        //fake epsilon lol
+                        if (Math.Abs(collisionTimes[i, j] - currentLowest) < 0.00000000001)
+                        {
+                            lowestIndices.Add(new int[] { i + (int)Math.Floor(bBox[0].Y), j + (int)Math.Floor(bBox[0].X)});
+                        }
+                    }
+                }
+                //System.Diagnostics.Debug.WriteLine(currentLowest);
+                
+                if (currentLowest < (elapsedTime / 1000))
+                {
+                    int tile;
+                    //System.Diagnostics.Debug.Write(currentLowest);
+                    Vector2 collisionPos = Vector2.Subtract(initialPos, Vector2.Multiply(velocity,currentLowest));
+                    //System.Diagnostics.Debug.WriteLine(collisionPos);
+                    foreach (int[] index in lowestIndices)
+                    {
+                        int i = index[0];
+                        int j = index[1];
+                        tile = collisionArray[i, j];
+                        System.Diagnostics.Debug.WriteLine(tile);
+                        switch (tile)
+                        {
+                            case 1:
+                                tilePoly = new CollisionPoly(new Vector2[] { new Vector2(i * tileSize, j * tileSize), new Vector2((i + 1) * tileSize, (j) * tileSize), new Vector2((i + 1) * tileSize, (j + 1) * tileSize), new Vector2((i) * tileSize, (j+1) * tileSize) });
+                                break;
+                            case 2:
+                                tilePoly = new CollisionPoly(new Vector2[] { new Vector2((i + 1) * tileSize, j * tileSize), new Vector2((i + 1) * tileSize, (j + 1) * tileSize), new Vector2(i * tileSize, (j + 1) * tileSize) });
+                                break;
+                            case 3:
+                                tilePoly = new CollisionPoly(new Vector2[] { new Vector2(i * tileSize, j * tileSize), new Vector2((i + 1) * tileSize, (j + 1) * tileSize), new Vector2(i * tileSize, (j + 1) * tileSize) });
+                                break;
+                            default:
+                                tilePoly = new CollisionPoly(new Vector2[4]);
+                                break;
+                        }
+                        playerPoly = new CollisionPoly(player.Verts);
+                        //System.Diagnostics.Debug.WriteLine(player.Position);
+                        System.Diagnostics.Debug.Write(calculateIntersection(playerPoly, tilePoly, null));
+                        System.Diagnostics.Debug.Write("calculating tile " + i + ", " + j + ")");
+                        player.Position = Vector2.Subtract(player.Position, calculateIntersection(playerPoly, tilePoly, null));
+                        //System.Diagnostics.Debug.WriteLine(player.Position);
+                        velocity = Vector2.Divide(Vector2.Subtract(player.Position, collisionPos), elapsedTime / (1000) * unitConversion);
+                        //System.Diagnostics.Debug.WriteLine(velocity);
+                        //player.Position = Vector2.Add(player.Position, unitConversion * velocity * (elapsedTime - currentLowest) / (1000));
+                        //System.Diagnostics.Debug.Write(player.Position);
+                        initialPos = player.Position;
+                    }
+                    //System.Diagnostics.Debug.Write(isCollision(playerPoly, tilePoly));
+                }
+                else
+                {
+                    //System.Diagnostics.Debug.WriteLine(Vector2.Divide(Vector2.Subtract(player.Position, initialPos), elapsedTime / (1000)).X + "," + Vector2.Divide(Vector2.Subtract(player.Position, initialPos), elapsedTime / (1000)).Y);
+
+                    return velocity;
+                }
             }
+            
+
+
+            /*
+            //int i = (int)Math.Floor(bBox[0].X);
+            //int j = (int)Math.Floor(bBox[0].Y);
+            Vector2[] bBox = broadPhase(initialPos, player.Position, new Vector2(player.Width, player.Height));
+            Vector2 finalPos = Vector2.Add(initialPos,velocity);
+            Vector2[] finalPosVerts = Enumerable.ToArray<Vector2>(from vert in player.Verts select Vector2.Add(vert, velocity));
+            CollisionPoly playerPoly = new CollisionPoly(finalPosVerts);
+            int currentTile;
+            int i = (int)Math.Floor(bBox[0].X);
+            int j = (int)Math.Floor(bBox[0].Y);
+            
+            while (i < (int)Math.Ceiling(bBox[1].X))
+            {
+                
+                while (j < (int)Math.Ceiling(bBox[1].Y))
+                {
+                    currentTile = collisionArray[j, i];
+
+                    switch (currentTile)
+                    {
+                        case 0:
+                            break;
+                        case 1:
+                            CollisionPoly collisionBox = new CollisionPoly(new Vector2[] { new Vector2(i * tileSize, j * tileSize), new Vector2((i + 1) * tileSize, j * tileSize), new Vector2((i + 1) * tileSize, (j + 1) * tileSize), new Vector2(i * tileSize, (j + 1) * tileSize) });
+                            if (isCollision(playerPoly, collisionBox))
+                            {
+                                float collisionTime = calculateIntersection(playerPoly, collisionBox, velocity).Length() / velocity.Length();
+                                //player.Position = Vector2.Add(player.Position, Vector2.Multiply(velocity, collisionTime));
+                                
+                                System.Diagnostics.Debug.Write(calculateIntersection(playerPoly, collisionBox, null));
+                                System.Diagnostics.Debug.Write("calculating tile " + i + ", " + j + ")");
+                                finalPos = Vector2.Subtract(finalPos, calculateIntersection(playerPoly, collisionBox, null));
+                                finalPosVerts = Enumerable.ToArray<Vector2>(from vert in finalPosVerts select Vector2.Subtract(finalPos, calculateIntersection(playerPoly, collisionBox, null)));
+                                playerPoly.vert = finalPosVerts;
+                                velocity = Vector2.Subtract(finalPos, player.Position);
+                                bBox = broadPhase(player.Position, finalPos, new Vector2(player.Height, player.Width));
+                                playerPoly = new CollisionPoly(player.Verts);
+                                i = (int)Math.Floor(bBox[0].X);
+                                j = (int)Math.Floor(bBox[0].Y);
+
+                            }
+                            break;
+                        case 2:
+                            CollisionPoly collisionTriangleL = new CollisionPoly(new Vector2[] { new Vector2((i + 1) * tileSize, j * tileSize), new Vector2((i + 1) * tileSize, (j + 1) * tileSize), new Vector2(i * tileSize, (j + 1) * tileSize) });
+                            if (isCollision(playerPoly, collisionTriangleL))
+                            {
+                                float collisionTime = calculateIntersection(playerPoly, collisionTriangleL, velocity).Length() / velocity.Length();
+                                player.Position = Vector2.Subtract(player.Position, Vector2.Multiply(velocity, collisionTime));
+
+                                //System.Diagnostics.Debug.Write(calculateIntersection(playerPoly, collisionBox, null));
+                                finalPos = Vector2.Subtract(finalPos, calculateIntersection(playerPoly, collisionTriangleL, null));
+                                finalPosVerts = Enumerable.ToArray<Vector2>(from vert in finalPosVerts select Vector2.Subtract(finalPos, calculateIntersection(playerPoly, collisionTriangleL, null)));
+                                playerPoly.vert = finalPosVerts;
+                                velocity = Vector2.Subtract(finalPos, player.Position);
+                                bBox = broadPhase(player.Position, finalPos, new Vector2(player.Height, player.Width));
+                                playerPoly = new CollisionPoly(player.Verts);
+                                i = (int)Math.Floor(bBox[0].X);
+                                j = (int)Math.Floor(bBox[0].Y);
+                            }
+                            break;
+                        case 3:
+                            CollisionPoly collisionTriangleR = new CollisionPoly(new Vector2[] { new Vector2(i * tileSize, j * tileSize), new Vector2((i + 1) * tileSize, (j + 1) * tileSize), new Vector2(i * tileSize, (j + 1) * tileSize) });
+                            if (isCollision(playerPoly, collisionTriangleR))
+                            {
+                                float collisionTime = calculateIntersection(playerPoly, collisionTriangleR, velocity).Length() / velocity.Length();
+                                player.Position = Vector2.Subtract(player.Position, Vector2.Multiply(velocity, collisionTime));
+
+                                //System.Diagnostics.Debug.Write(calculateIntersection(playerPoly, collisionBox, null));
+                                finalPos = Vector2.Subtract(finalPos, calculateIntersection(playerPoly, collisionTriangleR, null));
+                                finalPosVerts = Enumerable.ToArray<Vector2>(from vert in finalPosVerts select Vector2.Subtract(finalPos, calculateIntersection(playerPoly, collisionTriangleR, null)));
+                                playerPoly.vert = finalPosVerts;
+                                velocity = Vector2.Subtract(finalPos, player.Position);
+                                bBox = broadPhase(player.Position, finalPos, new Vector2(player.Height, player.Width));
+                                playerPoly = new CollisionPoly(player.Verts);
+                                i = (int)Math.Floor(bBox[0].X);
+                                j = (int)Math.Floor(bBox[0].Y);
+                            }
+                            break;
+                    }
+                    j++;
+                }
+                i++;
+                j = (int)Math.Floor(bBox[0].Y);
+            }
+            player.Position = finalPos;
+            return velocity;
+          */
         }
         
-       
+
+
     }
 }
+

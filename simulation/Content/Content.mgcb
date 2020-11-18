@@ -16,19 +16,24 @@
 
 #---------------------------------- Content ---------------------------------#
 
-#begin brick.png
-/copy:brick.png
-
 #begin Graphics/basicchar.xnb
 /copy:Graphics/basicchar.xnb
 
 #begin obj/WindowsStoreApp/Content/.mgstats
 /copy:obj/WindowsStoreApp/Content/.mgstats
 
-#begin test.tmx
+#begin test1.tmx
 /importer:TiledMapImporter
 /processor:TiledMapProcessor
-/build:test.tmx
+/build:test1.tmx
+
+#begin texture1.png
+/copy:texture1.png
+
+#begin tileset1.tsx
+/importer:TiledMapTilesetImporter
+/processor:TiledMapTilesetProcessor
+/build:tileset1.tsx
 
 #begin tileset1.tsx
 /importer:TiledMapTilesetImporter

@@ -24,6 +24,7 @@ namespace simulation
         TiledMapRenderer mapRenderer;
         Camera2d camera;
         int[,] collisionGrid;
+        CollisionMap collisionMap;
         //tracking user input
         KeyboardState currentKeyboardState;
         KeyboardState previousKeyboardState;
@@ -37,11 +38,13 @@ namespace simulation
         float playerAccel = 22.0f;
         float maxVel = 6.0f;
         float jumpVel = 12.0f;
-        float gAccel = 25.0f;
+        float gAccel = 1.0f;
         float frictionAccel = 12.0f;
-        float unitConversion = 128.0f;
+        int unitConversion = 128;
         //storing current velocity
         Vector2 currentVel;
+        //storing the initial position before moving the player
+        Vector2 initialPos;
        
 
         public Game1()
@@ -73,22 +76,29 @@ namespace simulation
         {
             // Create a new SpriteBatch, which can be used to draw textures.
             spriteBatch = new SpriteBatch(GraphicsDevice);
-            map = Content.Load<TiledMap>("test");
+            map = Content.Load<TiledMap>("test1");
             mapWidth = map.Width;
             mapHeight = map.Height;
             tileWidth = map.TileWidth;
-            collisionGrid = new int[mapWidth, mapHeight];
+            collisionGrid = new int[mapHeight, mapWidth];
             var tileLayer = map.GetLayer<TiledMapTileLayer>("Tile Layer 1");
             for(int i = 0; i < mapHeight; i++)
             {
                 for (int j = 0; j < mapWidth; j++)
                 {
-                    collisionGrid[i,j] = (int)(tileLayer.GetTile((ushort)i, (ushort)j).ToString()[18]);
+                    System.Diagnostics.Debug.Write((int)Char.GetNumericValue(tileLayer.GetTile((ushort)j, (ushort)i).ToString()[18]) + " ,");
+                    collisionGrid[i,j] = (int)Char.GetNumericValue(tileLayer.GetTile((ushort)j, (ushort)i).ToString()[18]);
                 }
+                System.Diagnostics.Debug.WriteLine("");
             }
+            //foreach (int i in collisionGrid)
+            //{
+            //    System.Diagnostics.Debug.Write("{0} ", i.ToString());
+            //}
+            collisionMap = new CollisionMap(collisionGrid, map.TileHeight);
             mapRenderer = new TiledMapRenderer(GraphicsDevice, map);
             // TODO: use this.Content to load your game content here
-            Vector2 playerPosition = new Vector2(GraphicsDevice.Viewport.TitleSafeArea.X, GraphicsDevice.Viewport.TitleSafeArea.Y + GraphicsDevice.Viewport.TitleSafeArea.Height / 2);
+            Vector2 playerPosition = new Vector2(GraphicsDevice.Viewport.TitleSafeArea.X,0);
             player.Initialize(Content.Load<Texture2D>("Graphics\\basicchar"), playerPosition,0);
             camera.Pos = new Vector2(playerPosition.X, playerPosition.Y);
         }
@@ -143,30 +153,32 @@ namespace simulation
             if (currentKeyboardState.IsKeyUp(Keys.Up) && currentVel.Y < 0) {
                 currentVel.Y = 0;
             }
-            if (3200-player.Height-player.Position.Y > 0)
+            if (320-player.Height-player.Position.Y > 0)
             {
                 currentVel.Y += (float)((gAccel * gameTime.ElapsedGameTime.TotalMilliseconds)/1000);
             }
             else {
                 currentVel.Y = 0;
             }
-            if (currentKeyboardState.IsKeyDown(Keys.Up) && player.Position.Y == 3200 - player.Height)
+            if (currentKeyboardState.IsKeyDown(Keys.Up) && player.Position.Y < player.Height)
             {
                 currentVel.Y = -jumpVel;
             }
             if (Math.Abs(currentVel.X) >= (frictionAccel * gameTime.ElapsedGameTime.TotalMilliseconds / 1000))
             {
                 currentVel.X -= (float)(currentVel.X / Math.Abs(currentVel.X) * frictionAccel * gameTime.ElapsedGameTime.TotalMilliseconds / 1000);
-            }
+            }  
             else {
                 currentVel.X = 0;
             }
-
-            player.Position.X += unitConversion * (float)((currentVel.X * gameTime.ElapsedGameTime.TotalMilliseconds)/1000);
-            player.Position.Y += unitConversion * (float)((currentVel.Y * gameTime.ElapsedGameTime.TotalMilliseconds)/1000);
-            camera.Move(unitConversion * currentVel * (float)gameTime.ElapsedGameTime.TotalMilliseconds / 1000);
-            player.Position.X = MathHelper.Clamp(player.Position.X, 0, 3200 - player.Width);
-            player.Position.Y = MathHelper.Clamp(player.Position.Y, 0, 3200 - player.Height);
+            initialPos = player.Position;
+            player.Position = Vector2.Add(new Vector2(unitConversion * (float)((currentVel.X * gameTime.ElapsedGameTime.TotalMilliseconds)/1000), unitConversion * (float)((currentVel.Y * gameTime.ElapsedGameTime.TotalMilliseconds) / 1000)), player.Position);
+            player.Position.X = MathHelper.Clamp(player.Position.X, 0, 1280 - player.Width);
+            player.Position.Y = MathHelper.Clamp(player.Position.Y, 0, 320 - player.Height);
+            currentVel = collisionMap.calculateCollisions(currentVel, initialPos, player, (float)gameTime.ElapsedGameTime.TotalMilliseconds, unitConversion); ;
+            camera.Pos = new Vector2(player.Position.X, player.Position.Y);
+            player.Position.X = MathHelper.Clamp(player.Position.X, 0, 1280 - player.Width);
+            player.Position.Y = MathHelper.Clamp(player.Position.Y, 0, 320 - player.Height);
             
         }
 
